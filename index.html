@@ -475,14 +475,15 @@ async function geocodeAll(){
 }
 
 // ===== MATH =====
-function haversine(a,b){const R=6371,dLat=(b.lat-a.lat)*Math.PI/180,dLon=(b.lng-a.lng)*Math.PI/180,
+function haversine(a,b){if(!a||!b||a.lat==null||a.lng==null||b.lat==null||b.lng==null)return 0;
+  const R=6371,dLat=(b.lat-a.lat)*Math.PI/180,dLon=(b.lng-a.lng)*Math.PI/180,
   x=Math.sin(dLat/2)**2+Math.cos(a.lat*Math.PI/180)*Math.cos(b.lat*Math.PI/180)*Math.sin(dLon/2)**2;
-  return R*2*Math.atan2(Math.sqrt(x),Math.sqrt(1-x))*1.35}
+  const result=R*2*Math.atan2(Math.sqrt(x),Math.sqrt(1-x))*1.35;return isNaN(result)?0:result}
 
 function distMatrix(pts){const n=pts.length,d=[];for(let i=0;i<n;i++)d[i]=new Float64Array(n);for(let i=0;i<n;i++)for(let j=i+1;j<n;j++){const v=haversine(pts[i],pts[j]);d[i][j]=v;d[j][i]=v}return d}
 
 function nn(dist,start){const n=dist.length,vis=new Set([start]),route=[start];let cur=start;
-  while(vis.size<n){let best=-1,bd=Infinity;for(let i=0;i<n;i++)if(!vis.has(i)&&dist[cur][i]<bd){bd=dist[cur][i];best=i}
+  while(vis.size<n){let best=-1,bd=Infinity;for(let i=0;i<n;i++){if(!vis.has(i)&&dist[cur]&&dist[cur][i]<bd){bd=dist[cur][i];best=i}}
   if(best<0)break;vis.add(best);route.push(best);cur=best}return route}
 
 function twoOpt(route,dist,ret){let best=[...route],bd=routeDist(best,dist,ret),imp=true,it=0;
@@ -490,7 +491,7 @@ function twoOpt(route,dist,ret){let best=[...route],bd=routeDist(best,dist,ret),
     const nr=[...best];nr.splice(i,j-i+1,...best.slice(i,j+1).reverse());const nd=routeDist(nr,dist,ret);
     if(nd<bd-.01){best=nr;bd=nd;imp=true}}}return best}
 
-function routeDist(r,d,ret){let t=0;for(let i=0;i<r.length-1;i++)t+=d[r[i]][r[i+1]];if(ret&&r.length>1)t+=d[r[r.length-1]][r[0]];return t}
+function routeDist(r,d,ret){let t=0;for(let i=0;i<r.length-1;i++){if(d[r[i]]&&d[r[i]][r[i+1]]!=null)t+=d[r[i]][r[i+1]]}if(ret&&r.length>1&&d[r[r.length-1]])t+=(d[r[r.length-1]][r[0]]||0);return t}
 
 // ===== K-MEANS CLUSTERING =====
 function kMeans(points, k){
@@ -790,7 +791,7 @@ function showVehicle(idx){
 
   ordered.forEach((p,i)=>{
     let legKm=0;
-    if(i>0){legKm=vr.dist[vr.route[i-1]][vr.route[i]];cumKm+=legKm;cumMin+=(legKm/speed)*60+stopMin}
+    if(i>0){const row=vr.dist[vr.route[i-1]];legKm=row?row[vr.route[i]]||0:0;cumKm+=legKm;cumMin+=(legKm/speed)*60+stopMin}
     if(p.isDepot){
       list.innerHTML+=`<div class="stop-item"><div class="stop-num" style="background:#0f172a;font-size:12px">🏭</div>
         <div class="stop-info"><div class="stop-name">Deposito</div><div class="stop-addr">${p.indirizzo}</div></div>
