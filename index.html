@@ -40,7 +40,7 @@ input[type="file"]{display:none}
 .form-group input,.form-group select,.form-group textarea{width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:.8rem;font-family:inherit}
 .form-group input:focus,.form-group select:focus{outline:none;border-color:var(--primary);box-shadow:0 0 0 3px rgba(37,99,235,.1)}
 textarea{resize:vertical;min-height:80px}
-#map{width:100%;height:480px;background:#e8e8e8}
+#map{width:100%;height:480px;background:#e8e8e8;cursor:crosshair}
 .stop-list{max-height:350px;overflow-y:auto}
 .stop-item{display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--border);font-size:.8rem;transition:.15s}
 .stop-item:hover{background:#f8fafc}
@@ -66,6 +66,8 @@ textarea{resize:vertical;min-height:80px}
 .badge-pri-alta{background:#fee2e2;color:#991b1b}
 .badge-pri-media{background:#e0f2fe;color:#075985}
 .badge-pri-bassa{background:#f1f5f9;color:#64748b}
+.badge-tw-ok{background:#dcfce7;color:#166534}
+.badge-tw-warn{background:#fef3c7;color:#92400e}
 .sample-format{background:#f1f5f9;border-radius:8px;padding:10px;font-family:'Courier New',monospace;font-size:.7rem;line-height:1.6;overflow-x:auto;margin:8px 0}
 .hidden{display:none}
 .spinner{display:inline-block;width:14px;height:14px;border:2px solid #fff;border-top-color:transparent;border-radius:50%;animation:spin .6s linear infinite}
@@ -80,13 +82,21 @@ textarea{resize:vertical;min-height:80px}
 .v-summary strong{display:block;font-size:.95rem}
 .v-actions{display:flex;gap:8px;padding:10px 14px;border-bottom:1px solid var(--border);flex-wrap:wrap}
 .summary-bar{padding:8px 18px;border-bottom:1px solid var(--border);font-size:.8rem;display:flex;gap:16px;flex-wrap:wrap;align-items:center}
-/* History panel */
 .history-item{display:flex;justify-content:space-between;align-items:center;padding:10px 14px;border-bottom:1px solid var(--border);font-size:.8rem}
 .history-item:hover{background:#f8fafc}
 .history-info{flex:1}
 .history-date{font-weight:600}
 .history-detail{color:var(--text2);font-size:.75rem}
-/* Print styles */
+.tpl-item{display:flex;justify-content:space-between;align-items:center;padding:10px 14px;border-bottom:1px solid var(--border);font-size:.8rem;cursor:pointer}
+.tpl-item:hover{background:#eff6ff}
+.tpl-name{font-weight:600}
+.tpl-detail{color:var(--text2);font-size:.75rem}
+.tpl-del{color:#dc2626;padding:4px 8px;border-radius:4px;opacity:.5;cursor:pointer;font-size:.8rem}
+.tpl-del:hover{opacity:1;background:#fee2e2}
+.driver-name-row{display:flex;gap:6px;align-items:center;margin-bottom:4px}
+.driver-name-row input{flex:1;padding:6px 8px;border:1px solid var(--border);border-radius:6px;font-size:.75rem}
+.driver-name-row .dn-color{width:16px;height:16px;border-radius:50%;flex-shrink:0}
+.map-hint{position:absolute;bottom:8px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,.7);color:#fff;padding:5px 14px;border-radius:20px;font-size:.7rem;z-index:1000;pointer-events:none}
 @media print{
   body{background:#fff!important}
   .header,.grid>div:first-child,#statsPanel,#exportBtns,.v-tabs,.v-actions,.btn,.no-print{display:none!important}
@@ -94,9 +104,7 @@ textarea{resize:vertical;min-height:80px}
   .card{box-shadow:none!important;border:1px solid #ddd!important;break-inside:avoid}
   #map{height:300px!important}
   .stop-list{max-height:none!important;overflow:visible!important}
-  .print-header{display:block!important}
 }
-.print-header{display:none;padding:16px;border-bottom:2px solid #000;margin-bottom:12px}
 </style>
 </head>
 <body>
@@ -105,7 +113,7 @@ textarea{resize:vertical;min-height:80px}
   <span style="font-size:1.8rem">🚛</span>
   <div>
     <h1>Ottimizzatore Giri di Consegna</h1>
-    <p>Carica le consegne → scegli quanti autisti → ottimizza i giri per zona</p>
+    <p>Carica le consegne → scegli quanti autisti → ottimizza i giri per zona · Clicca sulla mappa per aggiungere tappe</p>
   </div>
 </div>
 
@@ -122,7 +130,7 @@ textarea{resize:vertical;min-height:80px}
     </div>
     <div id="tab-csv" class="tab-content active">
       <div class="card-body">
-        <div class="alert alert-info"><span>ℹ️</span><div>Colonne: <b>nome, indirizzo</b> (obblig.) — opzionali: <b>lat, long, finestra_inizio, finestra_fine, priorità, peso_kg, volume</b></div></div>
+        <div class="alert alert-info"><span>ℹ️</span><div>Colonne: <b>nome, indirizzo</b> (obblig.) — opzionali: <b>lat, long, finestra_inizio, finestra_fine, priorità, peso_kg</b></div></div>
         <div class="sample-format">nome;indirizzo;finestra_inizio;finestra_fine;priorità;peso_kg
 Rossi Srl;Via Roma 15, Ancona;08:00;12:00;alta;150
 Bianchi SpA;Via Marconi 8, Jesi;09:00;17:00;media;80
@@ -159,7 +167,7 @@ Verdi & Co;SS16, Civitanova Marche;;;bassa;200</div>
     <div class="card-body">
       <div class="form-group"><label>Indirizzo deposito</label><input type="text" id="depotAddress" placeholder="Via Industria 1, Ancona"></div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
-        <div class="form-group"><label>🧑‍✈️ Numero autisti</label><input type="number" id="numDrivers" value="1" min="1" max="30"></div>
+        <div class="form-group"><label>🧑‍✈️ Numero autisti</label><input type="number" id="numDrivers" value="1" min="1" max="30" onchange="buildDriverNames()"></div>
         <div class="form-group"><label>🚗 Velocità media km/h</label><input type="number" id="avgSpeed" value="40" min="10" max="130"></div>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
@@ -167,8 +175,13 @@ Verdi & Co;SS16, Civitanova Marche;;;bassa;200</div>
         <div class="form-group"><label>🔄 Ritorno deposito</label><select id="returnDepot"><option value="yes">Sì</option><option value="no">No</option></select></div>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
-        <div class="form-group"><label>📦 Capacità max (kg, 0 = illim.)</label><input type="number" id="maxWeight" value="0" min="0"></div>
+        <div class="form-group"><label>📦 Capacità max (kg, 0=illim.)</label><input type="number" id="maxWeight" value="0" min="0"></div>
         <div class="form-group"><label>⛽ Costo carburante (€/km)</label><input type="number" id="fuelCost" value="0.35" min="0" max="5" step="0.01"></div>
+      </div>
+      <div class="form-group"><label>⏰ Ora partenza (per finestre temporali)</label><input type="time" id="startTime" value="08:00"></div>
+      <!-- Driver names -->
+      <div class="form-group"><label>🧑‍✈️ Nomi autisti</label>
+        <div id="driverNamesList"></div>
       </div>
     </div>
   </div>
@@ -185,6 +198,17 @@ Verdi & Co;SS16, Civitanova Marche;;;bassa;200</div>
     </div>
     <div id="stopsSummary" class="summary-bar" style="display:none"></div>
     <div class="stop-list" id="stopList"></div>
+  </div>
+
+  <!-- TEMPLATES -->
+  <div class="card" style="margin-top:12px">
+    <div class="card-header" style="justify-content:space-between">
+      <span>📋 Giri salvati (template)</span>
+      <button class="btn btn-outline" onclick="saveTemplate()" style="padding:4px 10px;font-size:.7rem">💾 Salva attuale</button>
+    </div>
+    <div id="templateList" style="max-height:200px;overflow-y:auto">
+      <div style="padding:14px;color:var(--text2);font-size:.8rem;text-align:center">Nessun template salvato</div>
+    </div>
   </div>
 
   <!-- HISTORY -->
@@ -214,7 +238,7 @@ Verdi & Co;SS16, Civitanova Marche;;;bassa;200</div>
   </div>
 
   <!-- MAP -->
-  <div class="card">
+  <div class="card" style="position:relative">
     <div class="card-header" style="justify-content:space-between;flex-wrap:wrap;gap:8px">
       <span>🗺️ Mappa percorsi</span>
       <div class="btn-group hidden" id="exportBtns" style="margin:0">
@@ -223,6 +247,7 @@ Verdi & Co;SS16, Civitanova Marche;;;bassa;200</div>
       </div>
     </div>
     <div id="map"></div>
+    <div class="map-hint" id="mapHint">📍 Clicca sulla mappa per aggiungere una tappa</div>
   </div>
 
   <!-- VEHICLE ROUTES -->
@@ -245,9 +270,6 @@ Verdi & Co;SS16, Civitanova Marche;;;bassa;200</div>
 </div>
 </div>
 </div>
-
-<!-- PRINT TEMPLATE (hidden) -->
-<div id="printArea" style="display:none"></div>
 
 <!-- LEAFLET CSS INLINED -->
 <style>
@@ -337,14 +359,40 @@ Verdi & Co;SS16, Civitanova Marche;;;bassa;200</div>
 .leaflet-control-scale-line:not(:first-child){border-top:2px solid #777;border-bottom:none;margin-top:-2px}
 .leaflet-control-scale-line:not(:first-child):not(:last-child){border-bottom:2px solid #777}
 </style>
-<!-- LEAFLET JS -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 
 <script>
 // ===== STATE =====
-let stops=[], vehicleRoutes=[], allPoints=[], depotCoords=null;
+let stops=[], vehicleRoutes=[], allPoints=[], depotCoords=null, driverNames=[];
 const COLORS=['#2563eb','#dc2626','#16a34a','#f59e0b','#7c3aed','#ec4899','#06b6d4','#84cc16','#f97316','#6366f1','#14b8a6','#e11d48','#0ea5e9','#a855f7','#65a30d','#be123c','#0891b2','#c026d3','#ea580c','#4f46e5','#059669','#db2777','#0284c7','#9333ea','#ca8a04','#e11d48','#0d9488','#7e22ce','#d97706','#4338ca'];
 const PRI_ORDER={alta:0,media:1,bassa:2};
+
+// ===== DRIVER NAMES =====
+function getDriverName(idx){return driverNames[idx]||('Autista '+(idx+1))}
+function buildDriverNames(){
+  const n=Math.max(1,+document.getElementById('numDrivers').value||1);
+  const el=document.getElementById('driverNamesList');
+  // Preserve existing names
+  const old=[];
+  el.querySelectorAll('input').forEach(inp=>old.push(inp.value));
+  el.innerHTML='';
+  for(let i=0;i<n;i++){
+    const row=document.createElement('div');
+    row.className='driver-name-row';
+    row.innerHTML=`<div class="dn-color" style="background:${COLORS[i%COLORS.length]}"></div>
+      <input type="text" placeholder="Autista ${i+1}" value="${old[i]||''}" onchange="updateDriverNames()">`;
+    el.appendChild(row);
+  }
+  updateDriverNames();
+}
+function updateDriverNames(){
+  driverNames=[];
+  document.querySelectorAll('#driverNamesList input').forEach((inp,i)=>{driverNames[i]=inp.value.trim()});
+  try{localStorage.setItem('ogc_dnames',JSON.stringify(driverNames))}catch(e){}
+}
+function loadDriverNames(){
+  try{const v=JSON.parse(localStorage.getItem('ogc_dnames')||'[]');if(v.length){driverNames=v;const el=document.getElementById('driverNamesList');el.innerHTML='';v.forEach((name,i)=>{const row=document.createElement('div');row.className='driver-name-row';row.innerHTML=`<div class="dn-color" style="background:${COLORS[i%COLORS.length]}"></div><input type="text" placeholder="Autista ${i+1}" value="${name||''}" onchange="updateDriverNames()">`;el.appendChild(row)})}}catch(e){}
+}
 
 // ===== LOCALSTORAGE =====
 function saveDepot(){try{localStorage.setItem('ogc_depot',document.getElementById('depotAddress').value)}catch(e){}}
@@ -356,14 +404,48 @@ function loadHistory(){
     const el=document.getElementById('historyList');
     if(!h.length){el.innerHTML='<div style="padding:14px;color:var(--text2);font-size:.8rem;text-align:center">Nessun giro salvato</div>';return}
     el.innerHTML='';
-    h.forEach((item,i)=>{
-      el.innerHTML+=`<div class="history-item">
-        <div class="history-info"><div class="history-date">${item.date} — ${item.drivers} autisti, ${item.stops} consegne</div>
-        <div class="history-detail">${item.km} km · ${item.time} · €${item.fuel}</div></div></div>`;
+    h.forEach(item=>{
+      el.innerHTML+=`<div class="history-item"><div class="history-info"><div class="history-date">${item.date} — ${item.drivers} autisti, ${item.stops} consegne</div><div class="history-detail">${item.km} km · ${item.time} · €${item.fuel}</div></div></div>`;
     });
   }catch(e){}
 }
 function clearHistory(){try{localStorage.removeItem('ogc_history')}catch(e){} loadHistory()}
+
+// ===== TEMPLATES =====
+function saveTemplate(){
+  if(!stops.length){alert('Carica prima delle tappe.');return}
+  const name=prompt('Nome del template (es. "Lunedì zona Ancona"):');
+  if(!name)return;
+  const tpl={name,depot:document.getElementById('depotAddress').value,stops:stops.map(s=>({nome:s.nome,indirizzo:s.indirizzo,lat:s.lat,lng:s.lng,t0:s.t0,t1:s.t1,pri:s.pri,peso:s.peso,note:s.note,geocoded:s.geocoded})),
+    drivers:+document.getElementById('numDrivers').value,date:new Date().toLocaleDateString('it-IT')};
+  try{let ts=JSON.parse(localStorage.getItem('ogc_templates')||'[]');ts.unshift(tpl);if(ts.length>20)ts=ts.slice(0,20);localStorage.setItem('ogc_templates',JSON.stringify(ts))}catch(e){}
+  loadTemplates();
+}
+function loadTemplate(idx){
+  try{
+    const ts=JSON.parse(localStorage.getItem('ogc_templates')||'[]');
+    const tpl=ts[idx];if(!tpl)return;
+    stops=tpl.stops.map((s,i)=>({...s,id:i+1}));
+    if(tpl.depot)document.getElementById('depotAddress').value=tpl.depot;
+    if(tpl.drivers)document.getElementById('numDrivers').value=tpl.drivers;
+    refreshUI();
+  }catch(e){}
+}
+function deleteTemplate(idx){
+  try{let ts=JSON.parse(localStorage.getItem('ogc_templates')||'[]');ts.splice(idx,1);localStorage.setItem('ogc_templates',JSON.stringify(ts))}catch(e){}
+  loadTemplates();
+}
+function loadTemplates(){
+  try{
+    const ts=JSON.parse(localStorage.getItem('ogc_templates')||'[]');
+    const el=document.getElementById('templateList');
+    if(!ts.length){el.innerHTML='<div style="padding:14px;color:var(--text2);font-size:.8rem;text-align:center">Nessun template salvato</div>';return}
+    el.innerHTML='';
+    ts.forEach((t,i)=>{
+      el.innerHTML+=`<div class="tpl-item" onclick="loadTemplate(${i})"><div><div class="tpl-name">📋 ${t.name}</div><div class="tpl-detail">${t.stops.length} tappe · ${t.date}</div></div><span class="tpl-del" onclick="event.stopPropagation();deleteTemplate(${i})">✕</span></div>`;
+    });
+  }catch(e){}
+}
 
 // ===== MAP =====
 let map, layerGroup;
@@ -371,12 +453,60 @@ function initMap(){
   map=L.map('map').setView([43.55,13.25],8);
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OpenStreetMap'}).addTo(map);
   layerGroup=L.layerGroup().addTo(map);
+  // Click-to-add
+  map.on('click',onMapClick);
 }
+
+// ===== CLICK ON MAP TO ADD STOP =====
+let mapClickBusy=false;
+async function onMapClick(e){
+  if(mapClickBusy)return;
+  mapClickBusy=true;
+  const lat=e.latlng.lat, lng=e.latlng.lng;
+  // Show temp marker
+  const tmpMarker=L.circleMarker([lat,lng],{radius:8,color:'#f59e0b',fillColor:'#f59e0b',fillOpacity:.9}).addTo(layerGroup);
+  const hint=document.getElementById('mapHint');
+  hint.textContent='🔍 Reverse geocoding...';
+  try{
+    const ctrl=new AbortController();
+    const timer=setTimeout(()=>ctrl.abort(),8000);
+    const r=await fetch('https://nominatim.openstreetmap.org/reverse?format=json&lat='+lat+'&lon='+lng+'&zoom=18&addressdetails=1',{signal:ctrl.signal});
+    clearTimeout(timer);
+    const d=await r.json();
+    let addr=d.display_name||`${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+    let nome='Tappa mappa';
+    if(d.address){
+      const a=d.address;
+      nome=a.road||a.suburb||a.village||a.town||nome;
+      const parts=[];
+      if(a.road)parts.push(a.road+(a.house_number?' '+a.house_number:''));
+      if(a.village||a.town||a.city)parts.push(a.village||a.town||a.city);
+      if(a.state)parts.push(a.state);
+      if(parts.length)addr=parts.join(', ');
+    }
+    stops.push({id:stops.length+1,nome,indirizzo:addr,lat,lng,t0:'',t1:'',pri:'media',peso:0,note:'',geocoded:true});
+    refreshUI();
+    hint.textContent='✅ Tappa aggiunta: '+nome;
+    setTimeout(()=>{hint.textContent='📍 Clicca sulla mappa per aggiungere una tappa'},3000);
+  }catch(err){
+    console.error('Reverse geocoding error:',err);
+    // Add with coords only
+    stops.push({id:stops.length+1,nome:'Punto mappa',indirizzo:`${lat.toFixed(5)}, ${lng.toFixed(5)}`,lat,lng,t0:'',t1:'',pri:'media',peso:0,note:'',geocoded:true});
+    refreshUI();
+    hint.textContent='📍 Clicca sulla mappa per aggiungere una tappa';
+  }
+  layerGroup.removeLayer(tmpMarker);
+  mapClickBusy=false;
+  // Rate limit: wait before next
+  await new Promise(r=>setTimeout(r,1100));
+}
+
 initMap();
 loadDepot();
 loadHistory();
-
-// Save depot on change
+loadTemplates();
+buildDriverNames();
+loadDriverNames();
 document.getElementById('depotAddress').addEventListener('change',saveDepot);
 
 // ===== TABS =====
@@ -420,8 +550,7 @@ function parseCSV(text){
     const s={id:i, nome:ci.nome>=0?v[ci.nome]:('Tappa '+i), indirizzo:ci.addr>=0?v[ci.addr]:v[1]||'',
       lat:ci.lat>=0&&v[ci.lat]?+v[ci.lat]:null, lng:ci.lng>=0&&v[ci.lng]?+v[ci.lng]:null,
       t0:ci.t0>=0?v[ci.t0]:'', t1:ci.t1>=0?v[ci.t1]:'',
-      pri:pri,
-      peso:ci.peso>=0?+v[ci.peso]||0:0,
+      pri:pri, peso:ci.peso>=0?+v[ci.peso]||0:0,
       note:ci.note>=0?v[ci.note]:'', geocoded:false};
     if(s.lat&&s.lng)s.geocoded=true;
     if(s.indirizzo||(s.lat&&s.lng))stops.push(s);
@@ -486,8 +615,6 @@ function refreshUI(){
   document.getElementById('stopsCard').classList.remove('hidden');
   document.getElementById('stopCount').textContent=stops.length;
   document.getElementById('btnGo').disabled=false;
-
-  // Summary bar
   const totalWeight=stops.reduce((s,st)=>s+(st.peso||0),0);
   const nAlta=stops.filter(s=>s.pri==='alta').length;
   const sumEl=document.getElementById('stopsSummary');
@@ -497,13 +624,11 @@ function refreshUI(){
   const maxW=+document.getElementById('maxWeight').value||0;
   const nDrv=+document.getElementById('numDrivers').value||1;
   if(maxW>0){
-    const capTot=maxW*nDrv;
-    const ok=totalWeight<=capTot;
+    const capTot=maxW*nDrv;const ok=totalWeight<=capTot;
     sumEl.innerHTML+='<span>🚛 <b>Cap. ('+nDrv+'×'+maxW+'):</b> '+capTot+' kg</span>';
     sumEl.innerHTML+='<span style="color:'+(ok?'#166534':'#dc2626')+'">'+(ok?'✅':'⚠️ +'+( totalWeight-capTot)+' kg')+'</span>';
     sumEl.style.background=ok?'#f0fdf4':'#fef2f2';
   } else { sumEl.style.background='#f0fdf4' }
-
   const list=document.getElementById('stopList');
   list.innerHTML='';
   stops.forEach((s,i)=>{
@@ -531,29 +656,22 @@ function showMarkers(list){
 // ===== GEOCODING =====
 async function geocodeAddr(addr){
   try{
-    const ctrl=new AbortController();
-    const timer=setTimeout(()=>ctrl.abort(),8000);
+    const ctrl=new AbortController();const timer=setTimeout(()=>ctrl.abort(),8000);
     const r=await fetch('https://nominatim.openstreetmap.org/search?format=json&q='+encodeURIComponent(addr)+'&countrycodes=it&limit=1',{signal:ctrl.signal});
-    clearTimeout(timer);
-    const d=await r.json();if(d&&d.length)return{lat:+d[0].lat,lng:+d[0].lon}
+    clearTimeout(timer);const d=await r.json();if(d&&d.length)return{lat:+d[0].lat,lng:+d[0].lon}
   }catch(e){console.log('Geocoding failed for:',addr,e)}
   return null}
 
 async function geocodeAll(){
-  const todo=stops.filter(s=>!s.geocoded);
-  if(!todo.length)return;
+  const todo=stops.filter(s=>!s.geocoded);if(!todo.length)return;
   const panel=document.getElementById('geocodeStatus');panel.classList.remove('hidden');
   const msg=document.getElementById('geocodeMsg'),prog=document.getElementById('geocodeProg');
   let done=0,fail=[];
   for(const s of todo){
     msg.textContent=`📍 Geocoding: ${s.nome} (${done+1}/${todo.length})...`;
     prog.style.width=((done/todo.length)*100)+'%';
-    try{
-      const c=await geocodeAddr(s.indirizzo);
-      if(c){s.lat=c.lat;s.lng=c.lng;s.geocoded=true}else fail.push(s.nome);
-    }catch(e){fail.push(s.nome)}
-    done++;
-    if(done<todo.length)await new Promise(r=>setTimeout(r,1100));
+    try{const c=await geocodeAddr(s.indirizzo);if(c){s.lat=c.lat;s.lng=c.lng;s.geocoded=true}else fail.push(s.nome)}catch(e){fail.push(s.nome)}
+    done++;if(done<todo.length)await new Promise(r=>setTimeout(r,1100));
   }
   prog.style.width='100%';
   if(fail.length)msg.textContent='⚠️ Non trovati ('+fail.length+'): '+fail.slice(0,5).join(', ')+(fail.length>5?'...':'');
@@ -580,6 +698,71 @@ function twoOpt(route,dist,ret){let best=[...route],bd=routeDist(best,dist,ret),
 
 function routeDist(r,d,ret){let t=0;for(let i=0;i<r.length-1;i++){if(d[r[i]]&&d[r[i]][r[i+1]]!=null)t+=d[r[i]][r[i+1]]}if(ret&&r.length>1&&d[r[r.length-1]])t+=(d[r[r.length-1]][r[0]]||0);return t}
 
+// ===== TIME HELPERS =====
+function parseTime(str){if(!str)return null;const p=str.split(':');if(p.length<2)return null;return parseInt(p[0])*60+parseInt(p[1])}
+function fmtMinutes(m){const h=Math.floor(m/60),mn=Math.round(m%60);return String(h).padStart(2,'0')+':'+String(mn).padStart(2,'0')}
+
+// ===== TIME-WINDOW-AWARE ROUTE ORDERING =====
+function twAwareSort(route, points, dist, speed, stopMin, startMin){
+  // If no time windows at all, skip
+  const hasTW=route.some(i=>points[i]&&!points[i].isDepot&&parseTime(points[i].t0)!=null);
+  if(!hasTW)return route;
+
+  const depotFirst=points[route[0]]&&points[route[0]].isDepot;
+  const depotIdx=depotFirst?route[0]:null;
+  const deliveries=depotFirst?route.slice(1):route.slice();
+
+  // Sort by: priority first, then earliest window start, then by current order
+  deliveries.sort((a,b)=>{
+    const pa=PRI_ORDER[points[a]?.pri||'media']??1;
+    const pb=PRI_ORDER[points[b]?.pri||'media']??1;
+    if(pa!==pb)return pa-pb;
+    const ta=parseTime(points[a]?.t0);
+    const tb=parseTime(points[b]?.t0);
+    if(ta!=null&&tb!=null)return ta-tb;
+    if(ta!=null)return -1;
+    if(tb!=null)return 1;
+    return 0;
+  });
+
+  // Greedy insertion: build route respecting windows
+  const result=[];
+  const remaining=[...deliveries];
+  let curTime=startMin;
+  let curPos=depotIdx!=null?depotIdx:remaining[0];
+
+  while(remaining.length>0){
+    let bestIdx=-1, bestScore=Infinity;
+    for(let r=0;r<remaining.length;r++){
+      const pi=remaining[r];
+      const travelMin=dist[curPos]?(dist[curPos][pi]||0)/speed*60:0;
+      const arriveAt=curTime+travelMin;
+      const t0=parseTime(points[pi]?.t0);
+      const t1=parseTime(points[pi]?.t1);
+      let penalty=0;
+      // If arrives after window end: heavy penalty
+      if(t1!=null&&arriveAt>t1)penalty+=1000+(arriveAt-t1);
+      // If arrives before window start: wait (small penalty)
+      else if(t0!=null&&arriveAt<t0)penalty+=(t0-arriveAt)*0.1;
+      // Priority bonus
+      const pri=PRI_ORDER[points[pi]?.pri||'media']??1;
+      penalty+=pri*50;
+      // Distance cost
+      penalty+=travelMin;
+      if(penalty<bestScore){bestScore=penalty;bestIdx=r}
+    }
+    const chosen=remaining.splice(bestIdx,1)[0];
+    result.push(chosen);
+    const travelMin=dist[curPos]?(dist[curPos][chosen]||0)/speed*60:0;
+    let arriveAt=curTime+travelMin;
+    const t0=parseTime(points[chosen]?.t0);
+    if(t0!=null&&arriveAt<t0)arriveAt=t0; // wait for window
+    curTime=arriveAt+stopMin;
+    curPos=chosen;
+  }
+  return depotIdx!=null?[depotIdx,...result]:result;
+}
+
 // ===== K-MEANS CLUSTERING =====
 function kMeans(points, k){
   if(k>=points.length)return points.map((_,i)=>[i]);
@@ -587,35 +770,21 @@ function kMeans(points, k){
   centroids.push({lat:points[0].lat,lng:points[0].lng});
   for(let c=1;c<k;c++){
     let maxD=0,best=0;
-    for(let i=0;i<points.length;i++){
-      let minD=Infinity;
-      for(const ce of centroids)minD=Math.min(minD,haversine(points[i],ce));
-      if(minD>maxD){maxD=minD;best=i}
-    }
+    for(let i=0;i<points.length;i++){let minD=Infinity;for(const ce of centroids)minD=Math.min(minD,haversine(points[i],ce));if(minD>maxD){maxD=minD;best=i}}
     centroids.push({lat:points[best].lat,lng:points[best].lng});
   }
-
   let assignments=new Array(points.length).fill(0);
   for(let iter=0;iter<50;iter++){
     let changed=false;
-    for(let i=0;i<points.length;i++){
-      let best=0,bd=Infinity;
-      for(let c=0;c<k;c++){const d=haversine(points[i],centroids[c]);if(d<bd){bd=d;best=c}}
-      if(assignments[i]!==best){assignments[i]=best;changed=true}
-    }
+    for(let i=0;i<points.length;i++){let best=0,bd=Infinity;for(let c=0;c<k;c++){const d=haversine(points[i],centroids[c]);if(d<bd){bd=d;best=c}}if(assignments[i]!==best){assignments[i]=best;changed=true}}
     if(!changed)break;
-    for(let c=0;c<k;c++){
-      const members=points.filter((_,i)=>assignments[i]===c);
-      if(members.length){centroids[c]={lat:members.reduce((s,p)=>s+p.lat,0)/members.length,lng:members.reduce((s,p)=>s+p.lng,0)/members.length}}
-    }
+    for(let c=0;c<k;c++){const members=points.filter((_,i)=>assignments[i]===c);if(members.length){centroids[c]={lat:members.reduce((s,p)=>s+p.lat,0)/members.length,lng:members.reduce((s,p)=>s+p.lng,0)/members.length}}}
   }
-
   const clusters=Array.from({length:k},()=>[]);
   assignments.forEach((c,i)=>clusters[c].push(i));
   return clusters.filter(c=>c.length>0);
 }
 
-// ===== WEIGHT-AWARE CLUSTERING =====
 function clusterWithWeight(points, k, maxW){
   if(maxW<=0)return kMeans(points,k);
   let clusters=kMeans(points,k);
@@ -626,8 +795,7 @@ function clusterWithWeight(points, k, maxW){
       const w=clusters[c].reduce((s,i)=>s+(points[i].peso||0),0);
       if(w>maxW){
         overloaded=true;
-        const centroid={lat:clusters[c].reduce((s,i)=>s+points[i].lat,0)/clusters[c].length,
-          lng:clusters[c].reduce((s,i)=>s+points[i].lng,0)/clusters[c].length};
+        const centroid={lat:clusters[c].reduce((s,i)=>s+points[i].lat,0)/clusters[c].length,lng:clusters[c].reduce((s,i)=>s+points[i].lng,0)/clusters[c].length};
         let farthest=0,fd=0;
         clusters[c].forEach((pi,idx)=>{const d=haversine(points[pi],centroid);if(d>fd){fd=d;farthest=idx}});
         const movePt=clusters[c].splice(farthest,1)[0];
@@ -636,10 +804,8 @@ function clusterWithWeight(points, k, maxW){
           if(c2===c)continue;
           const w2=clusters[c2].reduce((s,i)=>s+(points[i].peso||0),0);
           if(w2+(points[movePt].peso||0)<=maxW){
-            const cent2={lat:clusters[c2].reduce((s,i)=>s+points[i].lat,0)/clusters[c2].length,
-              lng:clusters[c2].reduce((s,i)=>s+points[i].lng,0)/clusters[c2].length};
-            const d=haversine(points[movePt],cent2);
-            if(d<bestD){bestD=d;bestC=c2}
+            const cent2={lat:clusters[c2].reduce((s,i)=>s+points[i].lat,0)/clusters[c2].length,lng:clusters[c2].reduce((s,i)=>s+points[i].lng,0)/clusters[c2].length};
+            const d=haversine(points[movePt],cent2);if(d<bestD){bestD=d;bestC=c2}
           }
         }
         if(bestC>=0)clusters[bestC].push(movePt);
@@ -650,37 +816,19 @@ function clusterWithWeight(points, k, maxW){
   return clusters.filter(c=>c.length>0);
 }
 
-// ===== PRIORITY SORT within route =====
-function prioritySort(route, points){
-  if(route.length<=2)return route;
-  // Keep depot (index 0) first if present, sort rest by priority
-  const depotIdx=points[route[0]]&&points[route[0]].isDepot?route[0]:null;
-  const rest=depotIdx!=null?route.slice(1):route.slice();
-  rest.sort((a,b)=>{
-    const pa=PRI_ORDER[points[a]?.pri||'media']??1;
-    const pb=PRI_ORDER[points[b]?.pri||'media']??1;
-    return pa-pb;
-  });
-  return depotIdx!=null?[depotIdx,...rest]:rest;
-}
-
 // ===== MAIN OPTIMIZE =====
 async function runOptimize(){
   const btn=document.getElementById('btnGo');
   btn.disabled=true;btn.innerHTML='<span class="spinner"></span> Ottimizzazione...';
-
   try{await geocodeAll()}catch(e){console.error('Geocoding error:',e)}
-
   const depAddr=document.getElementById('depotAddress').value.trim();
   depotCoords=null;
   if(depAddr){
     btn.innerHTML='<span class="spinner"></span> Geocoding deposito...';
-    try{const c=await geocodeAddr(depAddr);if(c)depotCoords=c}catch(e){console.error('Depot geocoding error:',e)}
+    try{const c=await geocodeAddr(depAddr);if(c)depotCoords=c}catch(e){console.error(e)}
   }
   if(!depotCoords&&stops.length&&stops[0].geocoded)depotCoords={lat:stops[0].lat,lng:stops[0].lng};
-
   btn.innerHTML='<span class="spinner"></span> Calcolo percorsi...';
-
   const valid=stops.filter(s=>s.geocoded);
   if(valid.length<2){alert('Servono almeno 2 tappe geocodificate.');btn.disabled=false;btn.innerHTML='🚀 Ottimizza giri';return}
 
@@ -690,6 +838,7 @@ async function runOptimize(){
   const retDep=document.getElementById('returnDepot').value==='yes';
   const maxW=+document.getElementById('maxWeight').value||0;
   const fuelCost=+document.getElementById('fuelCost').value||0;
+  const startMin=parseTime(document.getElementById('startTime').value)||480;
 
   allPoints=valid.map(s=>({...s}));
 
@@ -698,7 +847,6 @@ async function runOptimize(){
     await new Promise(r=>setTimeout(r,20));
     const actualK=Math.min(nDrivers,allPoints.length);
     const clusters=clusterWithWeight(allPoints,actualK,maxW);
-
     vehicleRoutes=[];
     let totalKm=0,totalKmOrig=0,maxTime=0;
 
@@ -706,60 +854,35 @@ async function runOptimize(){
       const cluster=clusters[vi];
       btn.innerHTML='<span class="spinner"></span> Percorso '+(vi+1)+'/'+clusters.length+'...';
       await new Promise(r=>setTimeout(r,20));
-
       const pts=[];
-      if(depotCoords)pts.push({lat:depotCoords.lat,lng:depotCoords.lng,nome:'🏭 Deposito',indirizzo:depAddr||'Deposito',isDepot:true,peso:0,pri:'media'});
+      if(depotCoords)pts.push({lat:depotCoords.lat,lng:depotCoords.lng,nome:'🏭 Deposito',indirizzo:depAddr||'Deposito',isDepot:true,peso:0,pri:'media',t0:'',t1:''});
       cluster.forEach(i=>{
         const src=allPoints[i];
         if(src&&src.lat!=null&&src.lng!=null)pts.push({lat:src.lat,lng:src.lng,nome:src.nome||'',indirizzo:src.indirizzo||'',isDepot:false,peso:src.peso||0,t0:src.t0||'',t1:src.t1||'',pri:src.pri||'media',note:src.note||''});
       });
-
-      if(pts.length<2){
-        if(pts.length===1)vehicleRoutes.push({id:vi,color:COLORS[vi%COLORS.length],points:pts,route:[0],dist:[[0]],km:0,time:0,nStops:pts.filter(p=>!p.isDepot).length,weight:0});
-        continue;
-      }
-
+      if(pts.length<2){if(pts.length===1)vehicleRoutes.push({id:vi,color:COLORS[vi%COLORS.length],points:pts,route:[0],dist:[[0]],km:0,time:0,nStops:pts.filter(p=>!p.isDepot).length,weight:0});continue}
       const validPts=pts.filter(p=>p.lat!=null&&p.lng!=null&&!isNaN(p.lat)&&!isNaN(p.lng));
       if(validPts.length<2)continue;
-
       const n=validPts.length;
       const dm=[];
       for(let i=0;i<n;i++)dm[i]=new Float64Array(n);
       for(let i=0;i<n;i++){for(let j=i+1;j<n;j++){const v=haversine(validPts[i],validPts[j]);dm[i][j]=v;dm[j][i]=v}}
-
       const seqRoute=[];for(let i=0;i<n;i++)seqRoute.push(i);
       const origDist=routeDist(seqRoute,dm,retDep&&!!depotCoords);
-
       let route=nn(dm,0);
       route=twoOpt(route,dm,retDep&&!!depotCoords);
-
-      // Apply priority: alta first within the route
-      const hasHighPri=validPts.some(p=>p.pri==='alta');
-      if(hasHighPri){
-        route=prioritySort(route,validPts);
-        // Re-run 2-opt on priority-sorted to optimize within constraint
-        // Actually just keep priority order — it's what the user wants
-      }
+      // Time-window-aware reordering
+      route=twAwareSort(route,validPts,dm,speed,stopMin,startMin);
 
       const optDist=routeDist(route,dm,retDep&&!!depotCoords);
       const nStops=validPts.filter(p=>!p.isDepot).length;
       const timeH=(optDist/speed)+(nStops*stopMin/60);
-
-      totalKm+=optDist;
-      totalKmOrig+=origDist;
-      maxTime=Math.max(maxTime,timeH);
-
-      vehicleRoutes.push({
-        id:vi, color:COLORS[vi%COLORS.length], points:validPts, route:route, dist:dm,
-        km:optDist, time:timeH, nStops,
-        weight:cluster.reduce((s,i)=>s+(allPoints[i]?allPoints[i].peso||0:0),0)
-      });
+      totalKm+=optDist;totalKmOrig+=origDist;maxTime=Math.max(maxTime,timeH);
+      vehicleRoutes.push({id:vi,color:COLORS[vi%COLORS.length],points:validPts,route:route,dist:dm,km:optDist,time:timeH,nStops,weight:cluster.reduce((s,i)=>s+(allPoints[i]?allPoints[i].peso||0:0),0)});
     }
 
     const savedKm=Math.max(0,totalKmOrig-totalKm);
     const totalFuel=(totalKm*fuelCost).toFixed(2);
-
-    // Stats
     document.getElementById('statsPanel').classList.remove('hidden');
     document.getElementById('statDrivers').textContent=vehicleRoutes.length;
     document.getElementById('statStops').textContent=allPoints.length;
@@ -767,68 +890,31 @@ async function runOptimize(){
     document.getElementById('statTime').textContent=fmtTime(maxTime);
     document.getElementById('statSaved').textContent=savedKm.toFixed(1);
     document.getElementById('statFuel').textContent='€'+totalFuel;
-
     drawAllRoutes(retDep&&!!depotCoords);
-
-    if(vehicleRoutes.length>0){
-      buildRouteTabs();
-      showVehicle(0);
-    }
-
+    if(vehicleRoutes.length>0){buildRouteTabs();showVehicle(0)}
     document.getElementById('routesCard').classList.remove('hidden');
     document.getElementById('exportBtns').classList.remove('hidden');
-
-    // Warn overloaded
-    if(maxW>0){
-      const over=vehicleRoutes.filter(v=>v.weight>maxW);
-      if(over.length>0){
-        alert('⚠️ '+over.length+' autista/i supera '+maxW+' kg!\n\n'+over.map(v=>'Autista '+(v.id+1)+': '+v.weight+' kg').join('\n'));
-      }
-    }
-
-    // Save to history
+    if(maxW>0){const over=vehicleRoutes.filter(v=>v.weight>maxW);if(over.length>0)alert('⚠️ '+over.length+' autista/i supera '+maxW+' kg!\n\n'+over.map(v=>getDriverName(v.id)+': '+v.weight+' kg').join('\n'))}
     const now=new Date();
-    saveHistory({
-      date:now.toLocaleDateString('it-IT')+' '+now.toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'}),
-      drivers:vehicleRoutes.length, stops:allPoints.length,
-      km:totalKm.toFixed(1), time:fmtTime(maxTime), fuel:totalFuel
-    });
+    saveHistory({date:now.toLocaleDateString('it-IT')+' '+now.toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'}),drivers:vehicleRoutes.length,stops:allPoints.length,km:totalKm.toFixed(1),time:fmtTime(maxTime),fuel:totalFuel});
     loadHistory();
-
-    // Update stops list with cluster colors
     refreshStopsWithColors();
-
-  }catch(err){
-    console.error('Errore ottimizzazione:',err);
-    alert('Errore: '+err.message);
-  }
-
+  }catch(err){console.error('Errore ottimizzazione:',err);alert('Errore: '+err.message)}
   btn.disabled=false;btn.innerHTML='🚀 Ottimizza giri';
 }
 
-// Color stops in sidebar after optimization
 function refreshStopsWithColors(){
-  const list=document.getElementById('stopList');
-  list.innerHTML='';
+  const list=document.getElementById('stopList');list.innerHTML='';
   stops.forEach((s,i)=>{
-    // Find which vehicle this stop belongs to
-    let vColor='var(--primary)';
-    let vNum='';
-    vehicleRoutes.forEach((vr)=>{
-      vr.points.forEach(p=>{
-        if(!p.isDepot && p.nome===s.nome && p.indirizzo===s.indirizzo){vColor=vr.color;vNum='A'+(vr.id+1)}
-      });
-    });
+    let vColor='var(--primary)',vLabel='';
+    vehicleRoutes.forEach(vr=>{vr.points.forEach(p=>{if(!p.isDepot&&p.nome===s.nome&&p.indirizzo===s.indirizzo){vColor=vr.color;vLabel=getDriverName(vr.id).substring(0,3)}})});
     const badge=s.geocoded?'<span class="badge badge-ok">📍OK</span>':'';
     const tw=s.t0?s.t0+'-'+s.t1:'';
     const priBadge=s.pri==='alta'?'<span class="badge badge-pri-alta">ALTA</span>':s.pri==='bassa'?'<span class="badge badge-pri-bassa">BASSA</span>':'';
-    list.innerHTML+=`<div class="stop-item">
-      <div class="stop-num" style="background:${vColor}">${vNum||i+1}</div>
+    list.innerHTML+=`<div class="stop-item"><div class="stop-num" style="background:${vColor}">${vLabel||i+1}</div>
       <div class="stop-info"><div class="stop-name">${s.nome} ${priBadge}</div><div class="stop-addr">${s.indirizzo} ${badge}</div></div>
-      ${tw?'<div class="stop-meta">'+tw+'</div>':''}
-      ${s.peso?'<div class="stop-meta">'+s.peso+'kg</div>':''}
-      <div class="stop-del" onclick="deleteStop(${i})" title="Rimuovi">✕</div>
-    </div>`;
+      ${tw?'<div class="stop-meta">'+tw+'</div>':''}${s.peso?'<div class="stop-meta">'+s.peso+'kg</div>':''}
+      <div class="stop-del" onclick="deleteStop(${i})" title="Rimuovi">✕</div></div>`;
   });
 }
 
@@ -836,28 +922,20 @@ function fmtTime(h){const hr=Math.floor(h),mn=Math.round((h-hr)*60);return hr>0?
 
 // ===== DRAW MAP =====
 function drawAllRoutes(retDep){
-  layerGroup.clearLayers();
-  const bounds=[];
-
+  layerGroup.clearLayers();const bounds=[];
   vehicleRoutes.forEach(vr=>{
     const ordered=vr.route.map(i=>vr.points[i]).filter(p=>p&&p.lat!=null&&p.lng!=null);
     const latlngs=ordered.map(p=>[p.lat,p.lng]);
     if(retDep&&latlngs.length>1)latlngs.push(latlngs[0]);
-
     L.polyline(latlngs,{color:vr.color,weight:4,opacity:.75}).addTo(layerGroup);
-
     let sn=0;
     ordered.forEach(p=>{
       bounds.push([p.lat,p.lng]);
       if(p.isDepot){
-        L.marker([p.lat,p.lng],{icon:L.divIcon({className:'',
-          html:`<div style="background:#0f172a;color:#fff;width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;border:3px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.3)">🏭</div>`,
-          iconSize:[30,30],iconAnchor:[15,15]})}).bindPopup('<b>🏭 Deposito</b>').addTo(layerGroup);
+        L.marker([p.lat,p.lng],{icon:L.divIcon({className:'',html:`<div style="background:#0f172a;color:#fff;width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;border:3px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.3)">🏭</div>`,iconSize:[30,30],iconAnchor:[15,15]})}).bindPopup('<b>🏭 Deposito</b>').addTo(layerGroup);
       } else {
         sn++;
-        L.marker([p.lat,p.lng],{icon:L.divIcon({className:'',
-          html:`<div style="background:${vr.color};color:#fff;width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:11px;border:2px solid #fff;box-shadow:0 2px 4px rgba(0,0,0,.3)">${sn}</div>`,
-          iconSize:[26,26],iconAnchor:[13,13]})}).bindPopup(`<b>${sn}. ${p.nome}</b><br>${p.indirizzo}${p.pri==='alta'?'<br><b style="color:red">⚡ PRIORITÀ ALTA</b>':''}`).addTo(layerGroup);
+        L.marker([p.lat,p.lng],{icon:L.divIcon({className:'',html:`<div style="background:${vr.color};color:#fff;width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:11px;border:2px solid #fff;box-shadow:0 2px 4px rgba(0,0,0,.3)">${sn}</div>`,iconSize:[26,26],iconAnchor:[13,13]})}).bindPopup(`<b>${sn}. ${p.nome}</b><br>${p.indirizzo}${p.pri==='alta'?'<br><b style="color:red">⚡ PRIORITÀ ALTA</b>':''}${p.t0?'<br>🕐 '+p.t0+'-'+p.t1:''}`).addTo(layerGroup);
       }
     });
   });
@@ -866,169 +944,133 @@ function drawAllRoutes(retDep){
 
 // ===== VEHICLE TABS =====
 function buildRouteTabs(){
-  const tabs=document.getElementById('vehicleTabs');
-  tabs.innerHTML='';
+  const tabs=document.getElementById('vehicleTabs');tabs.innerHTML='';
   vehicleRoutes.forEach((vr,i)=>{
     const t=document.createElement('div');
     t.className='v-tab'+(i===0?' active':'');
-    t.style.background=i===0?vr.color:'';
-    t.style.borderColor=i===0?vr.color:'';
-    t.textContent='Autista '+(i+1)+' ('+vr.nStops+')';
-    t.onclick=()=>showVehicle(i);
-    tabs.appendChild(t);
+    t.style.background=i===0?vr.color:'';t.style.borderColor=i===0?vr.color:'';
+    t.textContent=getDriverName(i)+' ('+vr.nStops+')';
+    t.onclick=()=>showVehicle(i);tabs.appendChild(t);
   });
 }
 
 function showVehicle(idx){
   const vr=vehicleRoutes[idx];
-  document.querySelectorAll('.v-tab').forEach((t,i)=>{
-    t.classList.toggle('active',i===idx);
-    t.style.background=i===idx?vehicleRoutes[i].color:'';
-    t.style.borderColor=i===idx?vehicleRoutes[i].color:'';
-  });
+  document.querySelectorAll('.v-tab').forEach((t,i)=>{t.classList.toggle('active',i===idx);t.style.background=i===idx?vehicleRoutes[i].color:'';t.style.borderColor=i===idx?vehicleRoutes[i].color:''});
   const speed=+document.getElementById('avgSpeed').value||40;
   const stopMin=+document.getElementById('stopTime').value||15;
   const fuelCost=+document.getElementById('fuelCost').value||0;
+  const startMin=parseTime(document.getElementById('startTime').value)||480;
   const fuelEur=(vr.km*fuelCost).toFixed(2);
+  const name=getDriverName(idx);
 
-  // Summary
   const sum=document.getElementById('vehicleSummary');
-  sum.innerHTML=`<span><strong>${vr.km.toFixed(1)} km</strong>distanza</span>
-    <span><strong>${fmtTime(vr.time)}</strong>tempo</span>
-    <span><strong>${vr.weight?vr.weight+' kg':'—'}</strong>peso</span>
-    <span><strong>€${fuelEur}</strong>carburante</span>`;
+  sum.innerHTML=`<span><strong>${vr.km.toFixed(1)} km</strong>distanza</span><span><strong>${fmtTime(vr.time)}</strong>tempo</span><span><strong>${vr.weight?vr.weight+' kg':'—'}</strong>peso</span><span><strong>€${fuelEur}</strong>carburante</span>`;
 
-  // Actions
   const act=document.getElementById('vehicleActions');
-  act.innerHTML=`<button class="btn btn-outline" onclick="openGoogleMaps(${idx})" style="font-size:.75rem">🗺️ Apri in Google Maps</button>
+  act.innerHTML=`<button class="btn btn-outline" onclick="openGoogleMaps(${idx})" style="font-size:.75rem">🗺️ Google Maps</button>
     <button class="btn btn-outline" onclick="printDriver(${idx})" style="font-size:.75rem">🖨️ Stampa foglio</button>`;
 
-  // Stops
-  const list=document.getElementById('vehicleStops');
-  list.innerHTML='';
+  const list=document.getElementById('vehicleStops');list.innerHTML='';
   const ordered=vr.route.map(i=>vr.points[i]).filter(p=>p&&p.lat!=null);
-  let sn=0,cumKm=0,cumMin=0;
+  let sn=0,cumKm=0,curTime=startMin;
 
   ordered.forEach((p,i)=>{
     let legKm=0;
-    if(i>0){const row=vr.dist[vr.route[i-1]];legKm=row?row[vr.route[i]]||0:0;cumKm+=legKm;cumMin+=(legKm/speed)*60+stopMin}
+    if(i>0){const row=vr.dist[vr.route[i-1]];legKm=row?row[vr.route[i]]||0:0;cumKm+=legKm}
+    const travelMin=legKm/speed*60;
+    if(i>0)curTime+=travelMin;
+    // Check time window
+    const t0=parseTime(p.t0),t1=parseTime(p.t1);
+    if(t0!=null&&curTime<t0)curTime=t0; // wait
+    const arriveStr=fmtMinutes(curTime);
+    let twStatus='';
+    if(t0!=null||t1!=null){
+      if(t1!=null&&curTime>t1)twStatus='<span class="badge badge-tw-warn">⚠️ FUORI FINESTRA</span>';
+      else twStatus='<span class="badge badge-tw-ok">✅ in orario</span>';
+    }
+
     if(p.isDepot){
       list.innerHTML+=`<div class="stop-item"><div class="stop-num" style="background:#0f172a;font-size:12px">🏭</div>
         <div class="stop-info"><div class="stop-name">Deposito</div><div class="stop-addr">${p.indirizzo}</div></div>
-        <div class="stop-meta">PARTENZA</div></div>`;
+        <div class="stop-meta">🕐 ${arriveStr}<br>PARTENZA</div></div>`;
     } else {
       sn++;
       const priTag=p.pri==='alta'?'<span class="badge badge-pri-alta" style="margin-left:4px">ALTA</span>':'';
-      const twTag=p.t0?'<div>🕐 '+p.t0+'-'+p.t1+'</div>':'';
       list.innerHTML+=`<div class="stop-item"><div class="stop-num" style="background:${vr.color}">${sn}</div>
-        <div class="stop-info"><div class="stop-name">${p.nome}${priTag}</div><div class="stop-addr">${p.indirizzo}</div></div>
-        <div class="stop-meta"><div>${legKm.toFixed(1)} km</div><div>~${Math.round(cumMin)} min</div>
-        ${p.peso?'<div>'+p.peso+' kg</div>':''}${twTag}</div></div>`;
+        <div class="stop-info"><div class="stop-name">${p.nome}${priTag}</div><div class="stop-addr">${p.indirizzo}</div>
+        ${twStatus?'<div style="margin-top:2px">'+twStatus+'</div>':''}</div>
+        <div class="stop-meta"><div>📏 ${legKm.toFixed(1)} km</div><div>🕐 ${arriveStr}</div>
+        ${p.t0?'<div>🪟 '+p.t0+'-'+p.t1+'</div>':''}
+        ${p.peso?'<div>📦 '+p.peso+' kg</div>':''}</div></div>`;
+      curTime+=stopMin;
     }
   });
 }
 
-// ===== GOOGLE MAPS LINK =====
+// ===== GOOGLE MAPS =====
 function openGoogleMaps(idx){
   const vr=vehicleRoutes[idx];
   const ordered=vr.route.map(i=>vr.points[i]).filter(p=>p&&p.lat!=null&&p.lng!=null);
   if(ordered.length<2){alert('Percorso troppo corto');return}
-
-  // Google Maps directions: origin / destination / waypoints
   const origin=ordered[0].lat+','+ordered[0].lng;
   const dest=ordered[ordered.length-1].lat+','+ordered[ordered.length-1].lng;
   const waypoints=ordered.slice(1,-1).map(p=>p.lat+','+p.lng).join('|');
-
   let url='https://www.google.com/maps/dir/?api=1&origin='+origin+'&destination='+dest;
   if(waypoints)url+='&waypoints='+waypoints;
   url+='&travelmode=driving';
-
   window.open(url,'_blank');
 }
 
-// ===== PRINT DRIVER SHEET =====
+// ===== PRINT =====
 function printDriver(idx){
   const vr=vehicleRoutes[idx];
   const speed=+document.getElementById('avgSpeed').value||40;
   const stopMin=+document.getElementById('stopTime').value||15;
+  const startMin=parseTime(document.getElementById('startTime').value)||480;
+  const name=getDriverName(idx);
   const ordered=vr.route.map(i=>vr.points[i]).filter(p=>p&&p.lat!=null);
 
-  let html=`<html><head><meta charset="UTF-8"><title>Foglio Autista ${idx+1}</title>
-  <style>
-    body{font-family:Arial,sans-serif;margin:20px;color:#333}
-    h1{font-size:18px;border-bottom:2px solid #000;padding-bottom:8px}
-    .info{display:flex;gap:30px;margin:12px 0;font-size:13px}
-    .info span{font-weight:bold}
-    table{width:100%;border-collapse:collapse;margin-top:12px;font-size:12px}
-    th{background:#f1f5f9;padding:8px;text-align:left;border:1px solid #ddd;font-size:11px;text-transform:uppercase}
-    td{padding:8px;border:1px solid #ddd;vertical-align:top}
-    tr:nth-child(even){background:#f8fafc}
-    .alta{color:#dc2626;font-weight:bold}
-    .footer{margin-top:20px;font-size:11px;color:#666;border-top:1px solid #ddd;padding-top:8px}
-    @media print{body{margin:10px}}
-  </style></head><body>
-  <h1>🚛 Foglio Consegne — Autista ${idx+1}</h1>
-  <div class="info">
-    <div>📏 <span>${vr.km.toFixed(1)} km</span></div>
-    <div>⏱️ <span>${fmtTime(vr.time)}</span></div>
-    <div>📦 <span>${vr.weight||0} kg</span></div>
-    <div>📅 <span>${new Date().toLocaleDateString('it-IT')}</span></div>
-  </div>
-  <table><tr><th>#</th><th>Cliente</th><th>Indirizzo</th><th>Finestra</th><th>Peso</th><th>Km</th><th>Tempo</th><th>Note/Firma</th></tr>`;
+  let html=`<html><head><meta charset="UTF-8"><title>Foglio ${name}</title>
+  <style>body{font-family:Arial,sans-serif;margin:20px;color:#333}h1{font-size:18px;border-bottom:2px solid #000;padding-bottom:8px}.info{display:flex;gap:30px;margin:12px 0;font-size:13px}.info span{font-weight:bold}table{width:100%;border-collapse:collapse;margin-top:12px;font-size:12px}th{background:#f1f5f9;padding:8px;text-align:left;border:1px solid #ddd;font-size:11px;text-transform:uppercase}td{padding:8px;border:1px solid #ddd;vertical-align:top}tr:nth-child(even){background:#f8fafc}.alta{color:#dc2626;font-weight:bold}.footer{margin-top:20px;font-size:11px;color:#666;border-top:1px solid #ddd;padding-top:8px}@media print{body{margin:10px}}</style></head><body>
+  <h1>🚛 Foglio Consegne — ${name}</h1>
+  <div class="info"><div>📏 <span>${vr.km.toFixed(1)} km</span></div><div>⏱️ <span>${fmtTime(vr.time)}</span></div><div>📦 <span>${vr.weight||0} kg</span></div><div>📅 <span>${new Date().toLocaleDateString('it-IT')}</span></div></div>
+  <table><tr><th>#</th><th>Cliente</th><th>Indirizzo</th><th>Arrivo</th><th>Finestra</th><th>Peso</th><th>Km</th><th>Note/Firma</th></tr>`;
 
-  let sn=0,cumKm=0,cumMin=0;
+  let sn=0,cumKm=0,curTime=startMin;
   ordered.forEach((p,i)=>{
+    let legKm=0;
+    if(i>0){const row=vr.dist[vr.route[i-1]];legKm=row?row[vr.route[i]]||0:0;cumKm+=legKm;curTime+=legKm/speed*60}
+    const t0=parseTime(p.t0);if(t0!=null&&curTime<t0)curTime=t0;
     if(p.isDepot){
-      html+=`<tr style="background:#e2e8f0"><td>🏭</td><td colspan="7"><b>DEPOSITO:</b> ${p.indirizzo}</td></tr>`;
+      html+=`<tr style="background:#e2e8f0"><td>🏭</td><td colspan="7"><b>DEPOSITO:</b> ${p.indirizzo} — Partenza ${fmtMinutes(curTime)}</td></tr>`;
     } else {
       sn++;
-      let legKm=0;
-      if(i>0){const row=vr.dist[vr.route[i-1]];legKm=row?row[vr.route[i]]||0:0;cumKm+=legKm;cumMin+=(legKm/speed)*60+stopMin}
       const priClass=p.pri==='alta'?'class="alta"':'';
+      const t1=parseTime(p.t1);
+      const late=t1!=null&&curTime>t1?' ⚠️':'';
       html+=`<tr><td>${sn}</td><td ${priClass}>${p.nome}${p.pri==='alta'?' ⚡':''}</td><td>${p.indirizzo}</td>
-        <td>${p.t0?p.t0+'-'+p.t1:''}</td><td>${p.peso||''}</td>
-        <td>${legKm.toFixed(1)}</td><td>~${Math.round(cumMin)}′</td><td style="min-width:80px"></td></tr>`;
+        <td>${fmtMinutes(curTime)}${late}</td><td>${p.t0?p.t0+'-'+p.t1:''}</td><td>${p.peso||''}</td>
+        <td>${legKm.toFixed(1)}</td><td style="min-width:80px"></td></tr>`;
+      curTime+=stopMin;
     }
   });
-
-  html+=`</table><div class="footer">Generato da Ottimizzatore Giri di Consegna — ${new Date().toLocaleString('it-IT')}</div>
-  <script>window.print();<\/script></body></html>`;
-
-  const w=window.open('','_blank');
-  w.document.write(html);
-  w.document.close();
+  html+=`</table><div class="footer">Generato da Ottimizzatore Giri di Consegna — ${new Date().toLocaleString('it-IT')}</div><script>window.print();<\/script></body></html>`;
+  const w=window.open('','_blank');w.document.write(html);w.document.close();
 }
 
 // ===== EXPORT =====
 function exportAll(){
   let csv='autista;ordine;nome;indirizzo;finestra_inizio;finestra_fine;priorità;peso_kg;note\n';
-  vehicleRoutes.forEach((vr,vi)=>{
-    let sn=0;
-    vr.route.map(i=>vr.points[i]).filter(p=>p).forEach(p=>{
-      if(p.isDepot)return;sn++;
-      csv+=`${vi+1};${sn};${p.nome};${p.indirizzo};${p.t0||''};${p.t1||''};${p.pri||''};${p.peso||''};${p.note||''}\n`;
-    });
-  });
+  vehicleRoutes.forEach((vr,vi)=>{let sn=0;vr.route.map(i=>vr.points[i]).filter(p=>p).forEach(p=>{if(p.isDepot)return;sn++;csv+=`${getDriverName(vi)};${sn};${p.nome};${p.indirizzo};${p.t0||''};${p.t1||''};${p.pri||''};${p.peso||''};${p.note||''}\n`})});
   downloadCSV(csv,'giri_consegna.csv');
 }
-
 function exportCoords(){
   let csv='autista;ordine;nome;indirizzo;lat;long;finestra_inizio;finestra_fine;priorità;peso_kg\n';
-  vehicleRoutes.forEach((vr,vi)=>{
-    let sn=0;
-    vr.route.map(i=>vr.points[i]).filter(p=>p).forEach(p=>{
-      if(p.isDepot)return;sn++;
-      csv+=`${vi+1};${sn};${p.nome};${p.indirizzo};${p.lat};${p.lng};${p.t0||''};${p.t1||''};${p.pri||''};${p.peso||''}\n`;
-    });
-  });
+  vehicleRoutes.forEach((vr,vi)=>{let sn=0;vr.route.map(i=>vr.points[i]).filter(p=>p).forEach(p=>{if(p.isDepot)return;sn++;csv+=`${getDriverName(vi)};${sn};${p.nome};${p.indirizzo};${p.lat};${p.lng};${p.t0||''};${p.t1||''};${p.pri||''};${p.peso||''}\n`})});
   downloadCSV(csv,'giri_con_coordinate.csv');
 }
-
-function downloadCSV(content,name){
-  const a=document.createElement('a');
-  a.href=URL.createObjectURL(new Blob(['﻿'+content],{type:'text/csv;charset=utf-8'}));
-  a.download=name;document.body.appendChild(a);a.click();document.body.removeChild(a);
-}
+function downloadCSV(content,name){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['﻿'+content],{type:'text/csv;charset=utf-8'}));a.download=name;document.body.appendChild(a);a.click();document.body.removeChild(a)}
 
 // ===== RESET =====
 function resetAll(){
