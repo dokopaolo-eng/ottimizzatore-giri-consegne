@@ -462,14 +462,14 @@ function haversine(a,b){const R=6371,dLat=(b.lat-a.lat)*Math.PI/180,dLon=(b.lng-
   x=Math.sin(dLat/2)**2+Math.cos(a.lat*Math.PI/180)*Math.cos(b.lat*Math.PI/180)*Math.sin(dLon/2)**2;
   return R*2*Math.atan2(Math.sqrt(x),Math.sqrt(1-x))*1.35}
 
-function distMatrix(pts){const n=pts.length,d=[];for(let i=0;i<n;i++){d[i]=new Float64Array(n);for(let j=i+1;j<n;j++){const v=haversine(pts[i],pts[j]);d[i][j]=v;d[j][i]=v}}return d}
+function distMatrix(pts){const n=pts.length,d=[];for(let i=0;i<n;i++)d[i]=new Float64Array(n);for(let i=0;i<n;i++)for(let j=i+1;j<n;j++){const v=haversine(pts[i],pts[j]);d[i][j]=v;d[j][i]=v}return d}
 
 function nn(dist,start){const n=dist.length,vis=new Set([start]),route=[start];let cur=start;
   while(vis.size<n){let best=-1,bd=Infinity;for(let i=0;i<n;i++)if(!vis.has(i)&&dist[cur][i]<bd){bd=dist[cur][i];best=i}
   if(best<0)break;vis.add(best);route.push(best);cur=best}return route}
 
 function twoOpt(route,dist,ret){let best=[...route],bd=routeDist(best,dist,ret),imp=true,it=0;
-  while(imp&&it<300){imp=false;it++;for(let i=1;i<route.length-1;i++)for(let j=i+1;j<route.length;j++){
+  while(imp&&it<50){imp=false;it++;for(let i=1;i<best.length-1;i++)for(let j=i+1;j<best.length;j++){
     const nr=[...best];nr.splice(i,j-i+1,...best.slice(i,j+1).reverse());const nd=routeDist(nr,dist,ret);
     if(nd<bd-.01){best=nr;bd=nd;imp=true}}}return best}
 
