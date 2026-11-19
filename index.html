@@ -585,66 +585,79 @@ async function runOptimize(){
   // Build points (depot = index 0 in each sub-route)
   allPoints=valid.map(s=>({...s}));
 
-  // Cluster
-  const actualK=Math.min(nDrivers,allPoints.length);
-  const clusters=clusterWithWeight(allPoints,actualK,maxW);
+  try{
+    // Cluster
+    btn.innerHTML='<span class="spinner"></span> Raggruppamento zone...';
+    await new Promise(r=>setTimeout(r,20));
+    const actualK=Math.min(nDrivers,allPoints.length);
+    const clusters=clusterWithWeight(allPoints,actualK,maxW);
 
-  // Optimize each cluster
-  vehicleRoutes=[];
-  let totalKm=0,totalKmOrig=0,maxTime=0;
+    // Optimize each cluster
+    vehicleRoutes=[];
+    let totalKm=0,totalKmOrig=0,maxTime=0;
 
-  clusters.forEach((cluster,vi)=>{
-    // Build sub-problem: depot + cluster stops
-    const pts=[];
-    if(depotCoords)pts.push({...depotCoords,nome:'🏭 Deposito',indirizzo:depAddr||'Deposito',isDepot:true,peso:0});
-    cluster.forEach(i=>pts.push({...allPoints[i],isDepot:false}));
+    for(let vi=0;vi<clusters.length;vi++){
+      const cluster=clusters[vi];
+      btn.innerHTML='<span class="spinner"></span> Percorso '+(vi+1)+'/'+clusters.length+'...';
+      await new Promise(r=>setTimeout(r,20));
 
-    const dm=distMatrix(pts);
-    const origDist=routeDist(pts.map((_,i)=>i),dm,retDep&&!!depotCoords);
+      const pts=[];
+      if(depotCoords)pts.push({...depotCoords,nome:'🏭 Deposito',indirizzo:depAddr||'Deposito',isDepot:true,peso:0});
+      cluster.forEach(i=>pts.push({...allPoints[i],isDepot:false}));
 
-    let route=nn(dm,0);
-    route=twoOpt(route,dm,retDep&&!!depotCoords);
+      if(pts.length<2){vehicleRoutes.push({id:vi,color:COLORS[vi%COLORS.length],points:pts,route:[0],dist:[[0]],km:0,time:0,nStops:pts.filter(p=>!p.isDepot).length,weight:0});continue}
 
-    const optDist=routeDist(route,dm,retDep&&!!depotCoords);
-    const nStops=pts.filter(p=>!p.isDepot).length;
-    const timeH=(optDist/speed)+(nStops*stopMin/60);
+      const dm=distMatrix(pts);
+      const origDist=routeDist(pts.map((_,i)=>i),dm,retDep&&!!depotCoords);
 
-    totalKm+=optDist;
-    totalKmOrig+=origDist;
-    maxTime=Math.max(maxTime,timeH);
+      let route=nn(dm,0);
+      route=twoOpt(route,dm,retDep&&!!depotCoords);
 
-    vehicleRoutes.push({
-      id:vi,
-      color:COLORS[vi%COLORS.length],
-      points:pts,
-      route:route,
-      dist:dm,
-      km:optDist,
-      time:timeH,
-      nStops,
-      weight:cluster.reduce((s,i)=>s+(allPoints[i].peso||0),0)
-    });
-  });
+      const optDist=routeDist(route,dm,retDep&&!!depotCoords);
+      const nStops=pts.filter(p=>!p.isDepot).length;
+      const timeH=(optDist/speed)+(nStops*stopMin/60);
 
-  const savedKm=Math.max(0,totalKmOrig-totalKm);
+      totalKm+=optDist;
+      totalKmOrig+=origDist;
+      maxTime=Math.max(maxTime,timeH);
 
-  // Stats
-  document.getElementById('statsPanel').classList.remove('hidden');
-  document.getElementById('statDrivers').textContent=vehicleRoutes.length;
-  document.getElementById('statStops').textContent=allPoints.length;
-  document.getElementById('statKm').textContent=totalKm.toFixed(1);
-  document.getElementById('statTime').textContent=fmtTime(maxTime);
-  document.getElementById('statSaved').textContent=savedKm.toFixed(1);
+      vehicleRoutes.push({
+        id:vi,
+        color:COLORS[vi%COLORS.length],
+        points:pts,
+        route:route,
+        dist:dm,
+        km:optDist,
+        time:timeH,
+        nStops,
+        weight:cluster.reduce((s,i)=>s+(allPoints[i].peso||0),0)
+      });
+    }
 
-  // Map
-  drawAllRoutes(retDep&&!!depotCoords);
+    const savedKm=Math.max(0,totalKmOrig-totalKm);
 
-  // Route tabs
-  buildRouteTabs();
-  showVehicle(0);
+    // Stats
+    document.getElementById('statsPanel').classList.remove('hidden');
+    document.getElementById('statDrivers').textContent=vehicleRoutes.length;
+    document.getElementById('statStops').textContent=allPoints.length;
+    document.getElementById('statKm').textContent=totalKm.toFixed(1);
+    document.getElementById('statTime').textContent=fmtTime(maxTime);
+    document.getElementById('statSaved').textContent=savedKm.toFixed(1);
 
-  document.getElementById('routesCard').classList.remove('hidden');
-  document.getElementById('exportBtns').classList.remove('hidden');
+    // Map
+    drawAllRoutes(retDep&&!!depotCoords);
+
+    // Route tabs
+    buildRouteTabs();
+    showVehicle(0);
+
+    document.getElementById('routesCard').classList.remove('hidden');
+    document.getElementById('exportBtns').classList.remove('hidden');
+
+  }catch(err){
+    console.error('Errore ottimizzazione:',err);
+    alert('Errore: '+err.message+'\n\nProva con meno autisti o senza limite peso.');
+  }
 
   btn.disabled=false;btn.innerHTML='🚀 Ottimizza giri';
 }
