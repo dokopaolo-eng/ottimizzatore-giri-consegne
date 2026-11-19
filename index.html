@@ -424,8 +424,14 @@ function showMarkers(list){
 
 // ===== GEOCODING =====
 async function geocodeAddr(addr){
-  try{const r=await fetch('https://nominatim.openstreetmap.org/search?format=json&q='+encodeURIComponent(addr)+'&countrycodes=it&limit=1');
-  const d=await r.json();if(d&&d.length)return{lat:+d[0].lat,lng:+d[0].lon}}catch(e){}return null}
+  try{
+    const ctrl=new AbortController();
+    const timer=setTimeout(()=>ctrl.abort(),8000);
+    const r=await fetch('https://nominatim.openstreetmap.org/search?format=json&q='+encodeURIComponent(addr)+'&countrycodes=it&limit=1',{signal:ctrl.signal});
+    clearTimeout(timer);
+    const d=await r.json();if(d&&d.length)return{lat:+d[0].lat,lng:+d[0].lon}
+  }catch(e){console.log('Geocoding failed for:',addr,e)}
+  return null}
 
 async function geocodeAll(){
   const todo=stops.filter(s=>!s.geocoded);
@@ -434,18 +440,21 @@ async function geocodeAll(){
   const msg=document.getElementById('geocodeMsg'),prog=document.getElementById('geocodeProg');
   let done=0,fail=[];
   for(const s of todo){
-    msg.textContent=`${s.nome} (${done+1}/${todo.length})...`;
+    msg.textContent=`📍 Geocoding: ${s.nome} (${done+1}/${todo.length})...`;
     prog.style.width=((done/todo.length)*100)+'%';
-    const c=await geocodeAddr(s.indirizzo);
-    if(c){s.lat=c.lat;s.lng=c.lng;s.geocoded=true}else fail.push(s.nome);
+    try{
+      const c=await geocodeAddr(s.indirizzo);
+      if(c){s.lat=c.lat;s.lng=c.lng;s.geocoded=true}else fail.push(s.nome);
+    }catch(e){fail.push(s.nome)}
     done++;
     if(done<todo.length)await new Promise(r=>setTimeout(r,1100));
   }
   prog.style.width='100%';
-  if(fail.length)msg.textContent='⚠️ Non trovati: '+fail.join(', ');
+  if(fail.length)msg.textContent='⚠️ Non trovati ('+fail.length+'): '+fail.slice(0,5).join(', ')+(fail.length>5?'...':'');
   else msg.textContent='✅ Tutti geocodificati!';
   stops=stops.filter(s=>s.geocoded);
-  setTimeout(()=>panel.classList.add('hidden'),3000);
+  if(!stops.length){msg.textContent='❌ Nessun indirizzo trovato. Prova con coordinate nel CSV.';return}
+  setTimeout(()=>panel.classList.add('hidden'),4000);
 }
 
 // ===== MATH =====
@@ -551,13 +560,18 @@ async function runOptimize(){
   const btn=document.getElementById('btnGo');
   btn.disabled=true;btn.innerHTML='<span class="spinner"></span> Ottimizzazione...';
 
-  await geocodeAll();
+  try{await geocodeAll()}catch(e){console.error('Geocoding error:',e)}
 
   // Geocode depot
   const depAddr=document.getElementById('depotAddress').value.trim();
   depotCoords=null;
-  if(depAddr){const c=await geocodeAddr(depAddr);if(c)depotCoords=c}
+  if(depAddr){
+    btn.innerHTML='<span class="spinner"></span> Geocoding deposito...';
+    try{const c=await geocodeAddr(depAddr);if(c)depotCoords=c}catch(e){console.error('Depot geocoding error:',e)}
+  }
   if(!depotCoords&&stops.length&&stops[0].geocoded)depotCoords={lat:stops[0].lat,lng:stops[0].lng};
+
+  btn.innerHTML='<span class="spinner"></span> Calcolo percorsi...';
 
   const valid=stops.filter(s=>s.geocoded);
   if(valid.length<2){alert('Servono almeno 2 tappe geocodificate.');btn.disabled=false;btn.innerHTML='🚀 Ottimizza giri';return}
