@@ -154,6 +154,7 @@ Verdi & Co;SS16, Civitanova Marche;;;200</div>
   <!-- STOPS LIST -->
   <div class="card hidden" id="stopsCard">
     <div class="card-header">📍 Tappe caricate (<span id="stopCount">0</span>)</div>
+    <div id="stopsSummary" style="display:none;padding:8px 18px;background:#f0fdf4;border-bottom:1px solid var(--border);font-size:.8rem;display:flex;gap:16px;flex-wrap:wrap"></div>
     <div class="stop-list" id="stopList"></div>
   </div>
 </div>
@@ -402,6 +403,22 @@ function refreshUI(){
   document.getElementById('stopsCard').classList.remove('hidden');
   document.getElementById('stopCount').textContent=stops.length;
   document.getElementById('btnGo').disabled=false;
+
+  // Summary bar
+  const totalWeight=stops.reduce((s,st)=>s+(st.peso||0),0);
+  const sumEl=document.getElementById('stopsSummary');
+  sumEl.style.display='flex';
+  sumEl.innerHTML='<span>📦 <b>Peso totale:</b> '+totalWeight+' kg</span>';
+  const maxW=+document.getElementById('maxWeight').value||0;
+  const nDrv=+document.getElementById('numDrivers').value||1;
+  if(maxW>0){
+    const capTot=maxW*nDrv;
+    const ok=totalWeight<=capTot;
+    sumEl.innerHTML+='<span>🚛 <b>Capacità totale ('+nDrv+'×'+maxW+'):</b> '+capTot+' kg</span>';
+    sumEl.innerHTML+='<span style="color:'+(ok?'#166534':'#dc2626')+'">'+( ok?'✅ OK':'⚠️ Sfora di '+(totalWeight-capTot)+' kg — aggiungi autisti o capacità')+'</span>';
+    sumEl.style.background=ok?'#f0fdf4':'#fef2f2';
+  }
+
   const list=document.getElementById('stopList');
   list.innerHTML='';
   stops.forEach((s,i)=>{
@@ -548,7 +565,7 @@ function clusterWithWeight(points, k, maxW){
           }
         }
         if(bestC>=0)clusters[bestC].push(movePt);
-        else{clusters.push([movePt])} // new vehicle needed
+        else{clusters[c].splice(farthest,0,movePt);overloaded=false} // keep in original cluster, don't add vehicles
       }
     }
   }
@@ -590,7 +607,9 @@ async function runOptimize(){
     btn.innerHTML='<span class="spinner"></span> Raggruppamento zone...';
     await new Promise(r=>setTimeout(r,20));
     const actualK=Math.min(nDrivers,allPoints.length);
+    console.log('Clustering',allPoints.length,'punti in',actualK,'gruppi, maxW=',maxW);
     const clusters=clusterWithWeight(allPoints,actualK,maxW);
+    console.log('Clusters creati:',clusters.length,clusters.map(c=>c.length));
 
     // Optimize each cluster
     vehicleRoutes=[];
@@ -602,19 +621,44 @@ async function runOptimize(){
       await new Promise(r=>setTimeout(r,20));
 
       const pts=[];
-      if(depotCoords)pts.push({...depotCoords,nome:'🏭 Deposito',indirizzo:depAddr||'Deposito',isDepot:true,peso:0});
-      cluster.forEach(i=>pts.push({...allPoints[i],isDepot:false}));
+      if(depotCoords)pts.push({lat:depotCoords.lat,lng:depotCoords.lng,nome:'🏭 Deposito',indirizzo:depAddr||'Deposito',isDepot:true,peso:0});
+      cluster.forEach(i=>{
+        const src=allPoints[i];
+        if(src&&src.lat!=null&&src.lng!=null)pts.push({lat:src.lat,lng:src.lng,nome:src.nome||'',indirizzo:src.indirizzo||'',isDepot:false,peso:src.peso||0,t0:src.t0||'',t1:src.t1||'',note:src.note||''});
+      });
 
-      if(pts.length<2){vehicleRoutes.push({id:vi,color:COLORS[vi%COLORS.length],points:pts,route:[0],dist:[[0]],km:0,time:0,nStops:pts.filter(p=>!p.isDepot).length,weight:0});continue}
+      console.log('Cluster',vi,': pts=',pts.length);
 
-      const dm=distMatrix(pts);
-      const origDist=routeDist(pts.map((_,i)=>i),dm,retDep&&!!depotCoords);
+      if(pts.length<2){
+        if(pts.length===1)vehicleRoutes.push({id:vi,color:COLORS[vi%COLORS.length],points:pts,route:[0],dist:[[0]],km:0,time:0,nStops:pts.filter(p=>!p.isDepot).length,weight:0});
+        continue;
+      }
+
+      // Validate all points have coordinates
+      const validPts=pts.filter(p=>p.lat!=null&&p.lng!=null&&!isNaN(p.lat)&&!isNaN(p.lng));
+      if(validPts.length<2){console.warn('Cluster',vi,'ha meno di 2 punti validi');continue}
+
+      const n=validPts.length;
+      console.log('distMatrix per',n,'punti');
+
+      // Build distance matrix safely
+      const dm=[];
+      for(let i=0;i<n;i++)dm[i]=new Float64Array(n);
+      for(let i=0;i<n;i++){
+        for(let j=i+1;j<n;j++){
+          const v=haversine(validPts[i],validPts[j]);
+          dm[i][j]=v;dm[j][i]=v;
+        }
+      }
+
+      const seqRoute=[];for(let i=0;i<n;i++)seqRoute.push(i);
+      const origDist=routeDist(seqRoute,dm,retDep&&!!depotCoords);
 
       let route=nn(dm,0);
       route=twoOpt(route,dm,retDep&&!!depotCoords);
 
       const optDist=routeDist(route,dm,retDep&&!!depotCoords);
-      const nStops=pts.filter(p=>!p.isDepot).length;
+      const nStops=validPts.filter(p=>!p.isDepot).length;
       const timeH=(optDist/speed)+(nStops*stopMin/60);
 
       totalKm+=optDist;
@@ -624,14 +668,15 @@ async function runOptimize(){
       vehicleRoutes.push({
         id:vi,
         color:COLORS[vi%COLORS.length],
-        points:pts,
+        points:validPts,
         route:route,
         dist:dm,
         km:optDist,
         time:timeH,
         nStops,
-        weight:cluster.reduce((s,i)=>s+(allPoints[i].peso||0),0)
+        weight:cluster.reduce((s,i)=>s+(allPoints[i]?allPoints[i].peso||0:0),0)
       });
+      console.log('Route',vi,'OK:',optDist.toFixed(1),'km');
     }
 
     const savedKm=Math.max(0,totalKmOrig-totalKm);
@@ -645,18 +690,31 @@ async function runOptimize(){
     document.getElementById('statSaved').textContent=savedKm.toFixed(1);
 
     // Map
+    console.log('Drawing routes...');
     drawAllRoutes(retDep&&!!depotCoords);
 
     // Route tabs
-    buildRouteTabs();
-    showVehicle(0);
+    if(vehicleRoutes.length>0){
+      buildRouteTabs();
+      showVehicle(0);
+    }
 
     document.getElementById('routesCard').classList.remove('hidden');
     document.getElementById('exportBtns').classList.remove('hidden');
 
+    // Warn if any vehicle exceeds weight capacity
+    if(maxW>0){
+      const overloaded=vehicleRoutes.filter(v=>v.weight>maxW);
+      if(overloaded.length>0){
+        alert('⚠️ Attenzione: '+overloaded.length+' autista/i supera la capacità di '+maxW+' kg!\n\n'+overloaded.map(v=>'Autista '+(v.id+1)+': '+v.weight+' kg').join('\n')+'\n\nConsidera di aumentare il numero autisti o la capacità.');
+      }
+    }
+    console.log('Ottimizzazione completata!');
+
   }catch(err){
     console.error('Errore ottimizzazione:',err);
-    alert('Errore: '+err.message+'\n\nProva con meno autisti o senza limite peso.');
+    console.error('Stack:',err.stack);
+    alert('Errore: '+err.message+'\n\nStack: '+(err.stack||'').split('\n').slice(0,3).join('\n'));
   }
 
   btn.disabled=false;btn.innerHTML='🚀 Ottimizza giri';
